@@ -14,31 +14,36 @@
 namespace json{
     
 
-enum token_type{
-    END_DOCUMENT,
-    BEGIN_OBJECT,
-    END_OBJECT,
-    BEGIN_ARRAY,
-    END_ARRAY,
-    SEP_COLON,
-    SEP_COMMA,
-    STRING,
-    NUMBER,
-    BOOLEAN,
-    NULL_VALUE
+enum token_type : uint16_t{
+    END_DOCUMENT = 1,
+    BEGIN_OBJECT = 2,
+    END_OBJECT = 4 ,
+    BEGIN_ARRAY = 8,
+    END_ARRAY= 16,
+    SEP_COLON = 32,
+    SEP_COMMA = 64,
+    STRING = 128,
+    NUMBER = 256,
+    BOOLEAN = 512,
+    NULL_VALUE= 1024
 };
 
-enum expect_token_type{
-    EXPECT_OBJECT_VALUE,
-    EXPECT_ARRAY_VALUE,
-    EXPECT_SINGLE_VALUE,
-    EXPECT_END_ARRAY,
-    EXPECT_COLON,
-    EXPECT_COMMA,
-    EXPECT_END_OBJECT,
-    EXPECT_END_DOCUMENT,
-    EXPECT_STRING
-}
+enum expect_token_type : uint16_t{
+    EXPECT_SINGLE_VALUE=1,
+    EXPECT_BEGIN_ARRAY=2,
+    EXPECT_END_ARRAY=4,
+    EXPECT_ARRAY_VALUE=8,
+
+    EXPECT_BEGIN_OBJECT=16,
+    EXPECT_END_OBJECT  =32,
+    EXPECT_OBJECT_KEY=64,
+    EXPECT_OBJECT_VALUE=128,
+
+    EXPECT_COLON=256,
+    EXPECT_COMMA=512,
+
+    EXPECT_END_DOCUMENT=1024
+};
 
 class json_char_reader{
 public:
@@ -188,14 +193,18 @@ private:
     std::variant<std::string, double, std::unordered_map<std::string, json_node>, bool, nullptr_t,std::vector<json_node>> json;
 };
 
-class json {};
+// class json {};
 
-class json_parse {
+class json_parser {
 public:
-    json_parse(std::string& str):token_reader(str){}
+    json_parser(std::string& str):token_reader(str){}
     json_value parse(){
-        std::stack<std::any> stack;
-        
+        json_value json;
+        token_type token = token_reader.next_token();
+        switch(token){
+            case BEGIN_OBJECT:
+                
+        }
     }
     std::string stringify(){
         
