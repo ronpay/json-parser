@@ -28,6 +28,18 @@ enum token_type{
     NULL_VALUE
 };
 
+enum expect_token_type{
+    EXPECT_OBJECT_VALUE,
+    EXPECT_ARRAY_VALUE,
+    EXPECT_SINGLE_VALUE,
+    EXPECT_END_ARRAY,
+    EXPECT_COLON,
+    EXPECT_COMMA,
+    EXPECT_END_OBJECT,
+    EXPECT_END_DOCUMENT,
+    EXPECT_STRING
+}
+
 class json_char_reader{
 public:
     json_char_reader(std::string& str):in(str){
@@ -162,11 +174,14 @@ public:
     std::vector<json_value> get_array() const{
         return std::get<std::vector<json_value>>(json);
     }
-    std::unordered_map<std::string,json_value> get_object() const{
+    std::unordered_map<std::string,json_node> get_object() const{
         return std::get<std::unordered_map<std::string, json_node>>(json);
     }
     template<class T> void set(T& value){
         json = value;
+    }
+    void put(std::string key, json_node& value){
+        std::get<std::unordered_map<std::string, json_node>>(json)[key] = value;
     }
 
 private:
@@ -178,7 +193,7 @@ class json {};
 class json_parse {
 public:
     json_parse(std::string& str):token_reader(str){}
-    json parse(){
+    json_value parse(){
         std::stack<std::any> stack;
         
     }
