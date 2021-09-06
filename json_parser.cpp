@@ -185,6 +185,9 @@ public:
     template<class T> void set(T& value){
         json = value;
     }
+    void set(double value){
+        json=value;
+    }
     void put(std::string key, json_node& value){
         std::get<std::unordered_map<std::string, json_node>>(json)[key] = value;
     }
@@ -201,8 +204,13 @@ public:
     json_value parse(){
         json_value json;
         token_type token = token_reader.next_token();
+        uint16_t expect = EXPECT_SINGLE_VALUE|EXPECT_BEGIN_ARRAY|EXPECT_BEGIN_OBJECT;
         switch(token){
-            case BEGIN_OBJECT:
+            case NUMBER:{
+                if (expect & EXPECT_SINGLE_VALUE){
+                    json.set(token_reader.read_number());
+                }
+            }
                 
         }
     }
