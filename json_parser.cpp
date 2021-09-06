@@ -1,8 +1,6 @@
-#include <any>
 #include <fmt/format.h>
 #include <fstream>
 #include <iostream>
-#include <map>
 #include <memory>
 #include <stack>
 #include <string>
@@ -10,6 +8,7 @@
 #include <utility>
 #include <variant>
 #include <vector>
+#include <stdexcept>
 
 namespace json {
 
@@ -69,7 +68,7 @@ class json_char_reader {
 
   private:
     std::ifstream in;
-};
+}; // class json_char_reader
 
 class json_token_reader {
   public:
@@ -134,12 +133,12 @@ class json_token_reader {
 
   private:
     json_char_reader char_reader;
-};
+}; // class json_token_reader
 
 class json_node {
   public:
   private:
-};
+}; // class json_node
 
 class json_value : public json_node {
   public:
@@ -196,20 +195,17 @@ class json_value : public json_node {
         return std::holds_alternative<T>(json);
     }
 
+    
+
   private:
     std::variant<std::string, double, std::unordered_map<std::string, std::shared_ptr<json_node>>, bool, nullptr_t, std::vector<std::shared_ptr<json_node>>>
         json;
-};
+}; // class json_value
 
 // class json {};
 
 class json_parser {
   public:
-    void print_error()
-    {
-        std::cout << __LINE__ << " error!!" << std::endl;
-        exit(0);
-    }
 
     json_parser(std::string& str) : token_reader(str) {}
     json_value parse()
@@ -238,7 +234,7 @@ class json_parser {
                         json.put_value(s, token_reader.read_number());
                         continue;
                     }
-                    print_error();
+                    throw std::runtime_error("Unexpected number.");
                 }
                 case BOOLEAN: {
                     if (expect & EXPECT_SINGLE_VALUE) {
@@ -258,7 +254,7 @@ class json_parser {
                         json.put_value(s, token_reader.read_boolean());
                         continue;
                     }
-                    print_error();
+                    throw std::runtime_error("Unexpected boolean.");
                 }
                 case STRING: {
                     if (expect & EXPECT_SINGLE_VALUE) {
@@ -283,7 +279,7 @@ class json_parser {
                         expect = EXPECT_COLON;
                         continue;
                     }
-                    print_error();
+                    throw std::runtime_error("Unexpected string.");
                 }
                 case NULL_VALUE: {
                     if (expect & EXPECT_SINGLE_VALUE) {
@@ -303,7 +299,7 @@ class json_parser {
                         json.put_value(s, nullptr);
                         continue;
                     }
-                    print_error();
+                    throw std::runtime_error("Unexpected null.");
                 }
                 case BEGIN_ARRAY: {
                     if (expect & EXPECT_BEGIN_ARRAY) {
@@ -312,7 +308,7 @@ class json_parser {
                         expect = EXPECT_ARRAY_VALUE | EXPECT_END_ARRAY;
                         continue;
                     }
-                    print_error();
+                    throw std::runtime_error("Unexpected end of array : [.");
                 }
                 case BEGIN_OBJECT: {
                     if (expect & EXPECT_BEGIN_OBJECT) {
@@ -321,7 +317,7 @@ class json_parser {
                         expect = EXPECT_OBJECT_KEY | EXPECT_END_OBJECT;
                         continue;
                     }
-                    print_error();
+                    throw std::runtime_error("Unexpected end of array : {.");
                 }
                 case END_ARRAY: {
                     if (expect & EXPECT_END_ARRAY) {
@@ -345,7 +341,7 @@ class json_parser {
                             continue;
                         }
                     }
-                    print_error();
+                    throw std::runtime_error("Unexpected end of array : ].");
                 }
                 case END_OBJECT: {
                     if (expect & EXPECT_END_OBJECT) {
@@ -369,21 +365,21 @@ class json_parser {
                             continue;
                         }
                     }
-                    print_error();
+                    throw std::runtime_error("Unexpected end of object : }.");
                 }
                 case SEP_COLON:{
                     if (expect & EXPECT_COLON) {
                         expect = EXPECT_OBJECT_VALUE|EXPECT_BEGIN_ARRAY|EXPECT_BEGIN_OBJECT;
                         continue;
                     }
-                    print_error();
+                    throw std::runtime_error("Unexpected colon.");
                 }
                 case SEP_COMMA:{
                     if (expect & EXPECT_COMMA) {
                         expect = EXPECT_ARRAY_VALUE | EXPECT_BEGIN_ARRAY | EXPECT_BEGIN_OBJECT;
                         continue;
                     }
-                    print_error();
+                    throw std::runtime_error("Unexpected comma.");
                 }
                 case END_DOCUMENT:{
                     if (expect & EXPECT_END_DOCUMENT) {
@@ -391,7 +387,7 @@ class json_parser {
                         if(json_stack.empty()) {
                             return json;
                         }
-                        print_error();
+                        throw std::runtime_error("Unexpected end of document.");
                     }
                 }
             }
@@ -400,5 +396,5 @@ class json_parser {
 
   private:
     json_token_reader token_reader;
-};
+}; // class json_parser
 };  // namespace json
