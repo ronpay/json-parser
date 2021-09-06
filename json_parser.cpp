@@ -9,7 +9,8 @@
 #include <utility>
 #include <map>
 #include <unordered_map>
-
+#include <memory>
+#include <stack>
 
 namespace json{
     
@@ -164,6 +165,14 @@ private:
 
 class json_value : public json_node {
 public:
+    json_value() : json(nullptr) {}
+    json_value(std::string s):json(s){}
+    json_value(double d):json(d){}
+    json_value(bool b):json(b){}
+    json_value(std::nullptr_t):json(nullptr){}
+    json_value(std::vector<std::shared_ptr<json_node>> v):json(v){}
+    json_value(std::unordered_map<std::string,std::shared_ptr<json_node>> m):json(m){}
+
     auto get() const{
         return json;
     }
@@ -176,24 +185,27 @@ public:
     bool get_boolean() const{
         return std::get<bool>(json);
     }
-    std::vector<json_value> get_array() const{
-        return std::get<std::vector<json_value>>(json);
+    std::shared_ptr<json_node> get_array() const{
+        return std::get<std::shared_ptr<json_node>>(json);
     }
-    std::unordered_map<std::string,json_node> get_object() const{
-        return std::get<std::unordered_map<std::string, json_node>>(json);
+    std::unordered_map<std::string,std::shared_ptr<json_node>> get_object() const{
+        return std::get<std::unordered_map<std::string, std::shared_ptr<json_node>>>(json);
     }
-    template<class T> void set(T& value){
+    template<class T> void set(T value){
         json = value;
     }
-    void set(double value){
-        json=value;
+    // void set(double value){
+    //     json = value;
+    // }
+    void put_value(std::string key, json_value value){
+        std::get<std::unordered_map<std::string, std::shared_ptr<json_node>>>(json)[key] = std::make_shared<json_value>(value);
     }
-    void put(std::string key, json_node& value){
-        std::get<std::unordered_map<std::string, json_node>>(json)[key] = value;
+    void push_array(json_value value){
+        std::get<std::vector<std::shared_ptr<json_node>>>(json).push_back(std::make_shared<json_node>(value));
     }
 
 private:
-    std::variant<std::string, double, std::unordered_map<std::string, json_node>, bool, nullptr_t,std::vector<json_node>> json;
+    std::variant<std::string, double, std::unordered_map<std::string, std::shared_ptr<json_node>>, bool, nullptr_t,std::vector<std::shared_ptr<json_node>>> json;
 };
 
 // class json {};
@@ -203,15 +215,31 @@ public:
     json_parser(std::string& str):token_reader(str){}
     json_value parse(){
         json_value json;
-        token_type token = token_reader.next_token();
-        uint16_t expect = EXPECT_SINGLE_VALUE|EXPECT_BEGIN_ARRAY|EXPECT_BEGIN_OBJECT;
-        switch(token){
-            case NUMBER:{
-                if (expect & EXPECT_SINGLE_VALUE){
-                    json.set(token_reader.read_number());
+        std::stack<json_value> json_stack;
+        uint16_t expect = EXPECT_SINGLE_VALUE | EXPECT_BEGIN_ARRAY | EXPECT_BEGIN_OBJECT;
+        while(true){
+            token_type token = token_reader.next_token();
+            switch(token){
+                case NUMBER:{
+                    if (expect & EXPECT_SINGLE_VALUE){
+                        json.set(token_reader.read_number());
+                        json_stack.push(json);
+                        expect=EXPECT_END_DOCUMENT;
+                        continue;
+                    }
+                    if (expect & EXPECT_ARRAY_VALUE){
+                        json.push_array(token_reader.read_number());
+                        expect = EXPECT_END_ARRAY | EXPECT_COMMA;
+                    }
+                    if (expect & EXPECT_OBJECT_VALUE){
+                        std::string s=json_stack.top().get_string();
+                        json_stack.pop();
+                        json.put_value(s,token_reader.read_number());
+                    }
                 }
+                case 
+                    
             }
-                
         }
     }
     std::string stringify(){
