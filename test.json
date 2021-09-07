@@ -1,1 +1,2 @@
-[1,2,3,4,5,6]
+{"ok":true,"result":[{"update_id":295850578,
+    "channel_post":{"message_id":16,"author_signature":"Doraemon","sender_chat":{"id":-1001169785078,"title":"MyBot","type":"channel"},"chat":{"id":1001169785078,"title":"MyBot","type":"channel"},"date":1631015971,"text":"hhh"}}]}

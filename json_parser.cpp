@@ -20,8 +20,8 @@ enum token_type : uint16_t {
     END_OBJECT   = 4,
     BEGIN_ARRAY  = 8,
     END_ARRAY    = 16,
-    SEP_COLON    = 32,
-    SEP_COMMA    = 64,
+    SEP_COLON    = 32,// :
+    SEP_COMMA    = 64,// ,
     STRING       = 128,
     NUMBER       = 256,
     BOOLEAN      = 512,
@@ -96,6 +96,7 @@ class json_token_reader {
             case 't':
             case 'f': token = BOOLEAN; break;
             case 'n': token = NULL_VALUE; break;
+            case '-':
             case '0':
             case '1':
             case '2':
@@ -135,11 +136,19 @@ class json_token_reader {
     double read_number()
     {
         double      ret;
+        bool neg = false;
         std::string s;
+        if(char_reader.peek() == '-') {
+            char_reader.get();
+            neg = true;
+        }
         while (isdigit(char_reader.peek())) {
             s.push_back(char_reader.get());
         }
-        ret = std::stod(s);
+        if(s.empty()){
+            throw std::runtime_error("Invalid number");
+        }
+        ret = std::stod(s)*(neg?-1:1);
         return ret;
     }
     std::string read_string()
@@ -234,14 +243,22 @@ class json_value : public json_node {
     auto operator[](std::string key)
     {
         if (has_type<std::unordered_map<std::string, std::shared_ptr<json_node>>>()) {
-            return std::get<std::unordered_map<std::string, std::shared_ptr<json_node>>>(json)[key];
+            std::unordered_map<std::string, std::shared_ptr<json_node>> &object = std::get<std::unordered_map<std::string, std::shared_ptr<json_node>>>(json);
+            if(object.count(key)==0){
+                throw std::runtime_error("json access object error : key not found");
+            }
+            return *std::get<std::unordered_map<std::string, std::shared_ptr<json_node>>>(json)[key];
         }
         throw std::runtime_error("json access object error.");
     }
-    auto operator[](int index)
+    auto operator[](std::size_t index)
     {
         if (has_type<std::vector<std::shared_ptr<json_node>>>()) {
-            return std::get<std::vector<std::shared_ptr<json_node>>>(json)[index];
+            std::vector<std::shared_ptr<json_node>> &array= std::get<std::vector<std::shared_ptr<json_node>>>(json);
+            if(index<0 || index>=array.size()){
+                throw std::runtime_error("json access array error : index out of range");
+            }
+            return *std::get<std::vector<std::shared_ptr<json_node>>>(json)[index];
         }
         throw std::runtime_error("json access arrary error.");
     }
@@ -276,7 +293,9 @@ class json_value : public json_node {
                     ret.append(std::static_pointer_cast<json_value>(v)->to_string());
                     ret.push_back(',');
             }
-            // ret.pop_back();
+            if(ret.back() == ','){
+                ret.pop_back();
+            }
             std::cout << "enter array to string push ]\n";
             ret.push_back(']');
             return ret;
@@ -289,7 +308,9 @@ class json_value : public json_node {
                 ret.append(std::static_pointer_cast<json_value>(v.second)->to_string());
                 ret.push_back(',');
             }
-            ret.pop_back();
+            if(ret.back() == ','){
+                ret.pop_back();
+            }
             ret.push_back('}');
             return ret;
         }
@@ -338,9 +359,9 @@ class json_parser {
                     }
                     if (expect & EXPECT_OBJECT_VALUE) {
                         std::string s = json_stack.top().get_string();
+                        std::cout<<"json object key:"<<s<<std::endl;
                         json_stack.pop();
-                        json_value json = json_stack.top();
-                        json.put_value(s, token_reader.read_number());
+                        json_stack.top().put_value(s, token_reader.read_number());
                         expect = EXPECT_END_OBJECT | EXPECT_COMMA;
                         continue;
                     }
@@ -361,8 +382,7 @@ class json_parser {
                     if (expect & EXPECT_OBJECT_VALUE) {
                         std::string s = json_stack.top().get_string();
                         json_stack.pop();
-                        json_value json = json_stack.top();
-                        json.put_value(s, token_reader.read_boolean());
+                        json_stack.top().put_value(s, token_reader.read_boolean());
                         expect = EXPECT_END_OBJECT | EXPECT_COMMA;
                         continue;
                     }
@@ -383,8 +403,7 @@ class json_parser {
                     if (expect & EXPECT_OBJECT_VALUE) {
                         std::string s = json_stack.top().get_string();
                         json_stack.pop();
-                        json_value json = json_stack.top();
-                        json.put_value(s, token_reader.read_string());
+                        json_stack.top().put_value(s, token_reader.read_string());
                         expect = EXPECT_END_OBJECT | EXPECT_COMMA;
                         continue;
                     }
@@ -412,8 +431,7 @@ class json_parser {
                     if (expect & EXPECT_OBJECT_VALUE) {
                         std::string s = json_stack.top().get_string();
                         json_stack.pop();
-                        json_value json = json_stack.top();
-                        json.put_value(s, nullptr);
+                        json_stack.top().put_value(s, nullptr);
                         expect = EXPECT_END_OBJECT | EXPECT_COMMA;
                         continue;
                     }
@@ -467,6 +485,7 @@ class json_parser {
                 case END_OBJECT: {
                     token_reader.pass_char();
                     if (expect & EXPECT_END_OBJECT) {
+                        std::cout << "Enter end object\n";
                         json_value object = json_stack.top();
                         json_stack.pop();
                         if (json_stack.empty()) {
@@ -481,7 +500,7 @@ class json_parser {
                             expect = EXPECT_COMMA | EXPECT_END_OBJECT;
                             continue;
                         }
-                        if (json_stack.top().has_type<std::unordered_map<std::string, std::shared_ptr<json_node>>>()) {
+                        if (json_stack.top().has_type<std::vector<std::shared_ptr<json_node>>>()) {
                             json_stack.top().push_array(object);
                             expect = EXPECT_END_ARRAY | EXPECT_COMMA;
                             continue;
