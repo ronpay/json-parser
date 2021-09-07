@@ -60,6 +60,7 @@ class json_char_reader {
         while (cnt--) {
             s.push_back(in.get());
         }
+        return s;
     }
     bool has_more()
     {
@@ -250,6 +251,7 @@ class json_value : public json_node {
             ret.push_back('}');
             return ret;
         }
+        throw std::runtime_error("json to string error.");
     }
 
   private:
