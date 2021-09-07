@@ -3,12 +3,12 @@
 #include <iostream>
 #include <memory>
 #include <stack>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
-#include <stdexcept>
 
 namespace json {
 
@@ -68,7 +68,7 @@ class json_char_reader {
 
   private:
     std::ifstream in;
-}; // class json_char_reader
+};  // class json_char_reader
 
 class json_token_reader {
   public:
@@ -98,6 +98,7 @@ class json_token_reader {
             case '7':
             case '8':
             case '9': token = NUMBER; break;
+            default: throw std::runtime_error("Unexpected json char"); break;
         }
         return token;
     }
@@ -133,12 +134,12 @@ class json_token_reader {
 
   private:
     json_char_reader char_reader;
-}; // class json_token_reader
+};  // class json_token_reader
 
 class json_node {
   public:
   private:
-}; // class json_node
+};  // class json_node
 
 class json_value : public json_node {
   public:
@@ -166,9 +167,9 @@ class json_value : public json_node {
     {
         return std::get<bool>(json);
     }
-    std::shared_ptr<json_node> get_array() const
+    std::vector<std::shared_ptr<json_node>> get_array() const
     {
-        return std::get<std::shared_ptr<json_node>>(json);
+        return std::get<std::vector<std::shared_ptr<json_node>>>(json);
     }
     std::unordered_map<std::string, std::shared_ptr<json_node>> get_object() const
     {
@@ -195,18 +196,71 @@ class json_value : public json_node {
         return std::holds_alternative<T>(json);
     }
 
-    
+    //* 访问json
+
+    auto operator[](std::string key)
+    {
+        if (has_type<std::unordered_map<std::string, std::shared_ptr<json_node>>>()) {
+            return std::get<std::unordered_map<std::string, std::shared_ptr<json_node>>>(json)[key];
+        }
+        throw std::runtime_error("json access object error.");
+    }
+    auto operator[](int index)
+    {
+        if (has_type<std::vector<std::shared_ptr<json_node>>>()) {
+            return std::get<std::vector<std::shared_ptr<json_node>>>(json)[index];
+        }
+        throw std::runtime_error("json access arrary error.");
+    }
+
+    std::string to_string()
+    {
+        if (has_type<std::string>()) {
+            return get_string();
+        }
+        if (has_type<double>()) {
+            return std::to_string(get_number());
+        }
+        if (has_type<bool>()) {
+            return get_boolean() ? "true" : "false";
+        }
+        if (has_type<nullptr_t>()) {
+            return "null";
+        }
+        std::string ret;
+        if(has_type<std::vector<std::shared_ptr<json_node>>>()){
+            ret.push_back('[');
+            for(auto& v : get_array()){
+                ret.append(std::static_pointer_cast<json_value>(v)->to_string());
+                ret.push_back(',');
+            }
+            ret.pop_back();
+            ret.push_back(']');
+            return ret;
+        }
+        if(has_type<std::unordered_map<std::string, std::shared_ptr<json_node>>>()){
+            ret.push_back('{');
+            for(auto& v : get_object()){
+                ret.append(v.first);
+                ret.push_back(':');
+                ret.append(std::static_pointer_cast<json_value>(v.second)->to_string());
+                ret.push_back(',');
+            }
+            ret.pop_back();
+            ret.push_back('}');
+            return ret;
+        }
+    }
 
   private:
     std::variant<std::string, double, std::unordered_map<std::string, std::shared_ptr<json_node>>, bool, nullptr_t, std::vector<std::shared_ptr<json_node>>>
         json;
-}; // class json_value
+};  // class json_value
 
 // class json {};
 
 class json_parser {
   public:
-
     json_parser(std::string& str) : token_reader(str) {}
     json_value parse()
     {
@@ -367,24 +421,24 @@ class json_parser {
                     }
                     throw std::runtime_error("Unexpected end of object : }.");
                 }
-                case SEP_COLON:{
+                case SEP_COLON: {
                     if (expect & EXPECT_COLON) {
-                        expect = EXPECT_OBJECT_VALUE|EXPECT_BEGIN_ARRAY|EXPECT_BEGIN_OBJECT;
+                        expect = EXPECT_OBJECT_VALUE | EXPECT_BEGIN_ARRAY | EXPECT_BEGIN_OBJECT;
                         continue;
                     }
                     throw std::runtime_error("Unexpected colon.");
                 }
-                case SEP_COMMA:{
+                case SEP_COMMA: {
                     if (expect & EXPECT_COMMA) {
                         expect = EXPECT_ARRAY_VALUE | EXPECT_BEGIN_ARRAY | EXPECT_BEGIN_OBJECT;
                         continue;
                     }
                     throw std::runtime_error("Unexpected comma.");
                 }
-                case END_DOCUMENT:{
+                case END_DOCUMENT: {
                     if (expect & EXPECT_END_DOCUMENT) {
                         json_stack.pop();
-                        if(json_stack.empty()) {
+                        if (json_stack.empty()) {
                             return json;
                         }
                         throw std::runtime_error("Unexpected end of document.");
@@ -396,5 +450,14 @@ class json_parser {
 
   private:
     json_token_reader token_reader;
-}; // class json_parser
+};  // class json_parser
 };  // namespace json
+
+
+int main() {
+    std::string       file = "test.json";
+    json::json_parser parser(file);
+    json::json_value json = parser.parse();
+    std::cout << json.to_string() << std::endl;
+    return 0;
+}
