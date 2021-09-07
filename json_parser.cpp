@@ -1,3 +1,5 @@
+#include <cctype>
+#include <cstdio>
 #include <fmt/format.h>
 #include <fstream>
 #include <iostream>
@@ -23,7 +25,8 @@ enum token_type : uint16_t {
     STRING       = 128,
     NUMBER       = 256,
     BOOLEAN      = 512,
-    NULL_VALUE   = 1024
+    NULL_VALUE   = 1024,
+    BLANK        = 2048
 };
 
 enum expect_token_type : uint16_t {
@@ -78,6 +81,10 @@ class json_token_reader {
     {
         token_type token;
         char       c = char_reader.peek();
+        if (c == -1) {
+            token = END_DOCUMENT;
+            return token;
+        }
         switch (c) {
             case '{': token = BEGIN_OBJECT; break;
             case '}': token = END_OBJECT; break;
@@ -99,7 +106,13 @@ class json_token_reader {
             case '7':
             case '8':
             case '9': token = NUMBER; break;
-            default: throw std::runtime_error("Unexpected json char"); break;
+            case ' ':
+            case '\n':
+            case '\r': token = BLANK; break;
+            default:
+                printf("%i\n", c);
+                throw std::runtime_error(fmt::format("Unexpect json char : {}", c));
+                break;
         }
         return token;
     }
@@ -108,17 +121,22 @@ class json_token_reader {
         bool ret;
         char c = char_reader.peek();
         switch (c) {
-            case 't': ret = true; break;
-            case 'f': ret = false; break;
+            case 't':
+                ret = true;
+                char_reader.next(4);
+                break;
+            case 'f':
+                ret = false;
+                char_reader.next(5);
+                break;
         }
-        char_reader.next(4);
         return ret;
     }
     double read_number()
     {
         double      ret;
         std::string s;
-        while (next_token() == NUMBER) {
+        while (isdigit(char_reader.peek())) {
             s.push_back(char_reader.get());
         }
         ret = std::stod(s);
@@ -127,10 +145,20 @@ class json_token_reader {
     std::string read_string()
     {
         std::string ret;
-        while (next_token() != STRING) {
+        char_reader.get();  // skip '"'
+        while (char_reader.peek() != '"') {
             ret.push_back(char_reader.get());
         }
+        char_reader.get();  // skip '"'
         return ret;
+    }
+    void pass_char()
+    {
+        char_reader.get();
+    }
+    void pass_null()
+    {
+        char_reader.next(4);
     }
 
   private:
@@ -216,32 +244,33 @@ class json_value : public json_node {
 
     std::string to_string()
     {
+        std::string ret;
         if (has_type<std::string>()) {
-            return get_string();
+            ret.push_back('"');
+            ret.append(get_string());
+            ret.push_back('"');
+            return ret;
         }
         if (has_type<double>()) {
-            return std::to_string(get_number());
+            ret = std::to_string(get_number());
+            return ret;
         }
         if (has_type<bool>()) {
             return get_boolean() ? "true" : "false";
         }
-        if (has_type<nullptr_t>()) {
-            return "null";
-        }
-        std::string ret;
-        if(has_type<std::vector<std::shared_ptr<json_node>>>()){
+        if (has_type<std::vector<std::shared_ptr<json_node>>>()) {
             ret.push_back('[');
-            for(auto& v : get_array()){
+            for (auto v : get_array()) {
                 ret.append(std::static_pointer_cast<json_value>(v)->to_string());
                 ret.push_back(',');
             }
-            ret.pop_back();
+            // ret.pop_back();
             ret.push_back(']');
             return ret;
         }
-        if(has_type<std::unordered_map<std::string, std::shared_ptr<json_node>>>()){
+        if (has_type<std::unordered_map<std::string, std::shared_ptr<json_node>>>()) {
             ret.push_back('{');
-            for(auto& v : get_object()){
+            for (auto& v : get_object()) {
                 ret.append(v.first);
                 ret.push_back(':');
                 ret.append(std::static_pointer_cast<json_value>(v.second)->to_string());
@@ -250,6 +279,9 @@ class json_value : public json_node {
             ret.pop_back();
             ret.push_back('}');
             return ret;
+        }
+        if (has_type<nullptr_t>()) {
+            return "null";
         }
         throw std::runtime_error("json to string error.");
     }
@@ -272,6 +304,10 @@ class json_parser {
         while (true) {
             token_type token = token_reader.next_token();
             switch (token) {
+                case BLANK: {
+                    token_reader.pass_char();
+                    continue;
+                }
                 case NUMBER: {
                     if (expect & EXPECT_SINGLE_VALUE) {
                         json.set(token_reader.read_number());
@@ -338,6 +374,7 @@ class json_parser {
                     throw std::runtime_error("Unexpected string.");
                 }
                 case NULL_VALUE: {
+                    token_reader.pass_null();
                     if (expect & EXPECT_SINGLE_VALUE) {
                         json.set(nullptr);
                         json_stack.push(json);
@@ -358,24 +395,27 @@ class json_parser {
                     throw std::runtime_error("Unexpected null.");
                 }
                 case BEGIN_ARRAY: {
+                    token_reader.pass_char();
                     if (expect & EXPECT_BEGIN_ARRAY) {
                         std::vector<std::shared_ptr<json_node>> v;
                         json_stack.push(json_value(v));
                         expect = EXPECT_ARRAY_VALUE | EXPECT_END_ARRAY;
                         continue;
                     }
-                    throw std::runtime_error("Unexpected end of array : [.");
+                    throw std::runtime_error("Unexpected begin of array : [.");
                 }
                 case BEGIN_OBJECT: {
+                    token_reader.pass_char();
                     if (expect & EXPECT_BEGIN_OBJECT) {
                         std::unordered_map<std::string, std::shared_ptr<json_node>> m;
                         json_stack.push(json_value(m));
                         expect = EXPECT_OBJECT_KEY | EXPECT_END_OBJECT;
                         continue;
                     }
-                    throw std::runtime_error("Unexpected end of array : {.");
+                    throw std::runtime_error("Unexpected begin of array : {.");
                 }
                 case END_ARRAY: {
+                    token_reader.pass_char();
                     if (expect & EXPECT_END_ARRAY) {
                         json_value array = json_stack.top();
                         json_stack.pop();
@@ -400,6 +440,7 @@ class json_parser {
                     throw std::runtime_error("Unexpected end of array : ].");
                 }
                 case END_OBJECT: {
+                    token_reader.pass_char();
                     if (expect & EXPECT_END_OBJECT) {
                         json_value object = json_stack.top();
                         json_stack.pop();
@@ -424,6 +465,7 @@ class json_parser {
                     throw std::runtime_error("Unexpected end of object : }.");
                 }
                 case SEP_COLON: {
+                    token_reader.pass_char();
                     if (expect & EXPECT_COLON) {
                         expect = EXPECT_OBJECT_VALUE | EXPECT_BEGIN_ARRAY | EXPECT_BEGIN_OBJECT;
                         continue;
@@ -431,6 +473,7 @@ class json_parser {
                     throw std::runtime_error("Unexpected colon.");
                 }
                 case SEP_COMMA: {
+                    token_reader.pass_char();
                     if (expect & EXPECT_COMMA) {
                         expect = EXPECT_ARRAY_VALUE | EXPECT_BEGIN_ARRAY | EXPECT_BEGIN_OBJECT;
                         continue;
@@ -439,6 +482,7 @@ class json_parser {
                 }
                 case END_DOCUMENT: {
                     if (expect & EXPECT_END_DOCUMENT) {
+                        json = json_stack.top();
                         json_stack.pop();
                         if (json_stack.empty()) {
                             return json;
@@ -455,11 +499,11 @@ class json_parser {
 };  // class json_parser
 };  // namespace json
 
-
-int main() {
+int main()
+{
     std::string       file = "test.json";
     json::json_parser parser(file);
-    json::json_value json = parser.parse();
+    json::json_value  json = parser.parse();
     std::cout << json.to_string() << std::endl;
     return 0;
 }
