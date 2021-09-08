@@ -20,8 +20,8 @@ enum token_type : uint16_t {
     END_OBJECT   = 4,
     BEGIN_ARRAY  = 8,
     END_ARRAY    = 16,
-    SEP_COLON    = 32,// :
-    SEP_COMMA    = 64,// ,
+    SEP_COLON    = 32,  // :
+    SEP_COMMA    = 64,  // ,
     STRING       = 128,
     NUMBER       = 256,
     BOOLEAN      = 512,
@@ -136,19 +136,19 @@ class json_token_reader {
     double read_number()
     {
         double      ret;
-        bool neg = false;
+        bool        neg = false;
         std::string s;
-        if(char_reader.peek() == '-') {
+        if (char_reader.peek() == '-') {
             char_reader.get();
             neg = true;
         }
         while (isdigit(char_reader.peek())) {
             s.push_back(char_reader.get());
         }
-        if(s.empty()){
+        if (s.empty()) {
             throw std::runtime_error("Invalid number");
         }
-        ret = std::stod(s)*(neg?-1:1);
+        ret = std::stod(s) * (neg ? -1 : 1);
         return ret;
     }
     std::string read_string()
@@ -178,6 +178,12 @@ class json_node {
   public:
   private:
 };  // class json_node
+
+std::ostream& operator<<(std::ostream& os, json_value& jv)
+{
+    os << jv.to_string();
+    return os;
+}
 
 class json_value : public json_node {
   public:
@@ -225,10 +231,10 @@ class json_value : public json_node {
         std::get<std::unordered_map<std::string, std::shared_ptr<json_node>>>(json)[key] = std::make_shared<json_value>(value);
     }
     void push_array(json_value value)
-    {   
-        std::cout<<"push array"<<std::endl;
-        if(value.has_type<double>()){
-            std::cout<<"push array number: "<<value.get_number()<<std::endl;
+    {
+        std::cout << "push array" << std::endl;
+        if (value.has_type<double>()) {
+            std::cout << "push array number: " << value.get_number() << std::endl;
         }
         std::get<std::vector<std::shared_ptr<json_node>>>(json).push_back(std::make_shared<json_value>(value));
     }
@@ -243,22 +249,22 @@ class json_value : public json_node {
     auto operator[](std::string key)
     {
         if (has_type<std::unordered_map<std::string, std::shared_ptr<json_node>>>()) {
-            std::unordered_map<std::string, std::shared_ptr<json_node>> &object = std::get<std::unordered_map<std::string, std::shared_ptr<json_node>>>(json);
-            if(object.count(key)==0){
+            std::unordered_map<std::string, std::shared_ptr<json_node>>& object = std::get<std::unordered_map<std::string, std::shared_ptr<json_node>>>(json);
+            if (object.count(key) == 0) {
                 throw std::runtime_error("json access object error : key not found");
             }
-            return *std::get<std::unordered_map<std::string, std::shared_ptr<json_node>>>(json)[key];
+            return *std::static_pointer_cast<json_value>(std::get<std::unordered_map<std::string, std::shared_ptr<json_node>>>(json)[key]);
         }
         throw std::runtime_error("json access object error.");
     }
     auto operator[](std::size_t index)
     {
         if (has_type<std::vector<std::shared_ptr<json_node>>>()) {
-            std::vector<std::shared_ptr<json_node>> &array= std::get<std::vector<std::shared_ptr<json_node>>>(json);
-            if(index<0 || index>=array.size()){
+            std::vector<std::shared_ptr<json_node>>& array = std::get<std::vector<std::shared_ptr<json_node>>>(json);
+            if (index < 0 || index >= array.size()) {
                 throw std::runtime_error("json access array error : index out of range");
             }
-            return *std::get<std::vector<std::shared_ptr<json_node>>>(json)[index];
+            return *std::static_pointer_cast<json_value>(std::get<std::vector<std::shared_ptr<json_node>>>(json)[index]);
         }
         throw std::runtime_error("json access arrary error.");
     }
@@ -286,14 +292,14 @@ class json_value : public json_node {
             ret.push_back('[');
             std::cout << "enter array to string push [\n";
             for (auto v : get_array()) {
-                if(std::static_pointer_cast<json_value>(v)->has_type<double>()){
+                if (std::static_pointer_cast<json_value>(v)->has_type<double>()) {
                     std::cout << "double member\n";
                 }
-                    std::cout << "array member:\n" << std::static_pointer_cast<json_value>(v)->to_string() << std::endl;
-                    ret.append(std::static_pointer_cast<json_value>(v)->to_string());
-                    ret.push_back(',');
+                std::cout << "array member:\n" << std::static_pointer_cast<json_value>(v)->to_string() << std::endl;
+                ret.append(std::static_pointer_cast<json_value>(v)->to_string());
+                ret.push_back(',');
             }
-            if(ret.back() == ','){
+            if (ret.back() == ',') {
                 ret.pop_back();
             }
             std::cout << "enter array to string push ]\n";
@@ -303,12 +309,14 @@ class json_value : public json_node {
         if (has_type<std::unordered_map<std::string, std::shared_ptr<json_node>>>()) {
             ret.push_back('{');
             for (auto& v : get_object()) {
+                ret.push_back('"');
                 ret.append(v.first);
+                ret.push_back('"');
                 ret.push_back(':');
                 ret.append(std::static_pointer_cast<json_value>(v.second)->to_string());
                 ret.push_back(',');
             }
-            if(ret.back() == ','){
+            if (ret.back() == ',') {
                 ret.pop_back();
             }
             ret.push_back('}');
@@ -320,6 +328,8 @@ class json_value : public json_node {
 
         throw std::runtime_error("json to string error.");
     }
+
+    friend std::ostream& operator<<(std::ostream& os, const json_value& j);
 
   private:
     std::variant<std::string, double, std::unordered_map<std::string, std::shared_ptr<json_node>>, bool, nullptr_t, std::vector<std::shared_ptr<json_node>>>
@@ -334,7 +344,7 @@ class json_parser {
     json_value parse()
     {
         std::stack<json_value> json_stack;
-        uint16_t               expect = EXPECT_SINGLE_VALUE | EXPECT_BEGIN_ARRAY | EXPECT_BEGIN_OBJECT;
+        uint16_t               expect    = EXPECT_SINGLE_VALUE | EXPECT_BEGIN_ARRAY | EXPECT_BEGIN_OBJECT;
         int                    token_cnt = 0;
         while (true) {
             token_type token = token_reader.next_token();
@@ -359,7 +369,7 @@ class json_parser {
                     }
                     if (expect & EXPECT_OBJECT_VALUE) {
                         std::string s = json_stack.top().get_string();
-                        std::cout<<"json object key:"<<s<<std::endl;
+                        std::cout << "json object key:" << s << std::endl;
                         json_stack.pop();
                         json_stack.top().put_value(s, token_reader.read_number());
                         expect = EXPECT_END_OBJECT | EXPECT_COMMA;
@@ -442,7 +452,7 @@ class json_parser {
                     if (expect & EXPECT_BEGIN_ARRAY) {
                         std::vector<std::shared_ptr<json_node>> v;
                         json_stack.push(json_value(v));
-                        expect = EXPECT_ARRAY_VALUE | EXPECT_BEGIN_OBJECT|EXPECT_BEGIN_ARRAY|EXPECT_END_ARRAY;
+                        expect = EXPECT_ARRAY_VALUE | EXPECT_BEGIN_OBJECT | EXPECT_BEGIN_ARRAY | EXPECT_END_ARRAY;
                         continue;
                     }
                     throw std::runtime_error("Unexpected begin of array : [.");
@@ -558,5 +568,6 @@ int main()
     json::json_parser parser(file);
     json::json_value  json = parser.parse();
     std::cout << json.to_string() << std::endl;
+    std::cout << json["ok"] << std::endl;
     return 0;
 }
