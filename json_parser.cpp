@@ -66,7 +66,7 @@ token_type json_token_reader::next_token()
         case '\r': token = BLANK; break;
         default:
             printf("%i\n", c);
-            throw std::runtime_error(fmt::format("Unexpect json char : {}", c));
+            throw std::runtime_error(fmt::format("Unexpected json char : {}", c));
             break;
     }
     return token;
@@ -119,7 +119,7 @@ void json_token_reader::pass_char()
 {
     char_reader.get();
 }
-void json_token_reader::pass_null()
+void json_token_reader::read_null()
 {
     char_reader.next(4);
 }
@@ -148,11 +148,11 @@ bool json_value::get_boolean() const
 {
     return std::get<bool>(json);
 }
-std::vector<std::shared_ptr<json_node>>& json_value::get_array()
+std::vector<std::shared_ptr<json_node>>& json_value::get_array ()
 {
     return std::get<std::vector<std::shared_ptr<json_node>>>(json);
 }
-std::unordered_map<std::string, std::shared_ptr<json_node>>& json_value::get_object()
+std::unordered_map<std::string, std::shared_ptr<json_node>>& json_value::get_object ()
 {
     return std::get<std::unordered_map<std::string, std::shared_ptr<json_node>>>(json);
 }
@@ -169,10 +169,10 @@ void json_value::put_value(std::string key, json_value value)
 }
 void json_value::push_array(json_value value)
 {
-    std::cout << "push array" << std::endl;
-    if (value.has_type<double>()) {
-        std::cout << "push array number: " << value.get_number() << std::endl;
-    }
+    // std::cout << "push array" << std::endl;
+    // if (value.has_type<double>()) {
+    //     std::cout << "push array number: " << value.get_number() << std::endl;
+    // }
     std::get<std::vector<std::shared_ptr<json_node>>>(json).push_back(std::make_shared<json_value>(value));
 }
 
@@ -208,7 +208,7 @@ json_value& json_value::operator[](std::size_t index)
 
 std::string json_value::to_string()
 {
-    std::cout << "enter to string entry\n";
+    // std::cout << "enter to string entry\n";
     std::string ret;
     if (has_type<std::string>()) {
         ret.push_back('"');
@@ -217,7 +217,7 @@ std::string json_value::to_string()
         return ret;
     }
     if (has_type<double>()) {
-        std::cout << "enter number to string\n";
+        // std::cout << "enter number to string\n";
         ret = std::to_string(get_number());
         return ret;
     }
@@ -225,21 +225,21 @@ std::string json_value::to_string()
         return get_boolean() ? "true" : "false";
     }
     if (has_type<std::vector<std::shared_ptr<json_node>>>()) {
-        std::cout << "enter array to string\n";
+        // std::cout << "enter array to string\n";
         ret.push_back('[');
-        std::cout << "enter array to string push [\n";
+        // std::cout << "enter array to string push [\n";
         for (auto v : get_array()) {
-            if (std::static_pointer_cast<json_value>(v)->has_type<double>()) {
-                std::cout << "double member\n";
-            }
-            std::cout << "array member:\n" << std::static_pointer_cast<json_value>(v)->to_string() << std::endl;
+            // if (std::static_pointer_cast<json_value>(v)->has_type<double>()) {
+            //     std::cout << "double member\n";
+            // }
+            // std::cout << "array member:\n" << std::static_pointer_cast<json_value>(v)->to_string() << std::endl;
             ret.append(std::static_pointer_cast<json_value>(v)->to_string());
             ret.push_back(',');
         }
         if (ret.back() == ',') {
             ret.pop_back();
         }
-        std::cout << "enter array to string push ]\n";
+        // std::cout << "enter array to string push ]\n";
         ret.push_back(']');
         return ret;
     }
@@ -273,10 +273,10 @@ json_value json_parser::parse()
 {
     std::stack<json_value> json_stack;
     uint16_t               expect    = EXPECT_SINGLE_VALUE | EXPECT_BEGIN_ARRAY | EXPECT_BEGIN_OBJECT;
-    int                    token_cnt = 0;
+    // int                    token_cnt = 0;
     while (true) {
         token_type token = token_reader.next_token();
-        std::cout << fmt::format("toekn {} : {}\n", token_cnt++, token);
+        // std::cout << fmt::format("token {} : {}\n", token_cnt++, token);
         switch (token) {
             case BLANK: {
                 token_reader.pass_char();
@@ -297,7 +297,7 @@ json_value json_parser::parse()
                 }
                 if (expect & EXPECT_OBJECT_VALUE) {
                     std::string s = json_stack.top().get_string();
-                    std::cout << "json object key:" << s << std::endl;
+                    // std::cout << "json object key:" << s << std::endl;
                     json_stack.pop();
                     json_stack.top().put_value(s, json_value(token_reader.read_number()));
                     expect = EXPECT_END_OBJECT | EXPECT_COMMA;
@@ -353,7 +353,7 @@ json_value json_parser::parse()
                 throw std::runtime_error("Unexpected string.");
             }
             case NULL_VALUE: {
-                token_reader.pass_null();
+                token_reader.read_null();
                 if (expect & EXPECT_SINGLE_VALUE) {
                     json_value json;
                     json.set(nullptr);
@@ -423,7 +423,7 @@ json_value json_parser::parse()
             case END_OBJECT: {
                 token_reader.pass_char();
                 if (expect & EXPECT_END_OBJECT) {
-                    std::cout << "Enter end object\n";
+                    // std::cout << "Enter end object\n";
                     json_value object = json_stack.top();
                     json_stack.pop();
                     if (json_stack.empty()) {
@@ -475,7 +475,7 @@ json_value json_parser::parse()
                     json_value json = json_stack.top();
                     json_stack.pop();
                     if (json_stack.empty()) {
-                        std::cout << "json parse success, return json." << std::endl;
+                        // std::cout << "json parse success, return json." << std::endl;
                         return json;
                     }
                 }
@@ -484,15 +484,3 @@ json_value json_parser::parse()
         }
     }
 };
-
-int main()
-{
-    std::string       file = "test.json";
-    json::json_parser parser(file);
-    json::json_value  json = parser.parse();
-    std::cout << json.to_string() << std::endl;
-    std::string s = "ok";
-    std::cout << json[s].to_string() << std::endl;
-    std::cout << json[s] << std::endl;
-    return 0;
-}

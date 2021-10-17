@@ -73,11 +73,10 @@ class json_token_reader {
     token_type next_token();
     bool       read_boolean();
     double     read_number();
-
+    void        read_null();
     std::string read_string();
 
     void pass_char();
-    void pass_null();
 
   private:
     json_char_reader char_reader;
@@ -87,6 +86,8 @@ class json_token_reader {
 
 class json_value : public json_node {
   public:
+    friend class json_parser;
+  private:
     explicit json_value() : json(nullptr) {}
     explicit json_value(std::string s): json(s) {}
     explicit json_value(double d): json(d) {}
@@ -99,8 +100,8 @@ class json_value : public json_node {
     std::string get_string() const;
     double      get_number() const;
     bool                                     get_boolean() const;
-    std::vector<std::shared_ptr<json_node>>&                     get_array();
-    std::unordered_map<std::string, std::shared_ptr<json_node>>& get_object();
+    std::vector<std::shared_ptr<json_node>>&                     get_array() ;
+    std::unordered_map<std::string, std::shared_ptr<json_node>>& get_object() ;
     template <class T> void                                      set(T value);
     // void set(double value){
     //     json = value;
@@ -111,7 +112,7 @@ class json_value : public json_node {
     template <class T> bool has_type();
 
     //* 访问json
-
+  public:
     json_value& operator[](std::string key);
     json_value& operator[](std::size_t index);
 
